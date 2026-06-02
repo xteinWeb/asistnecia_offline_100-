@@ -1,0 +1,73 @@
+name: totem_asistencia_offline
+description: "A new Flutter offline-first project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Base de datos local SQFlite (Nativa, sin generadores)
+  sqflite: ^2.3.3
+  sqflite_common_ffi: ^2.3.3
+  path_provider: ^2.1.4
+  path: ^1.9.0
+
+  # HTTP
+  http: ^1.2.2
+
+  # Cámara y Galería
+  camera: ^0.11.0+2
+  image_picker: ^1.1.2
+
+  # Detección facial offline
+  google_mlkit_face_detection: ^0.11.0
+
+  # Conectividad
+  connectivity_plus: ^6.0.5
+
+  # Estado
+  provider: ^6.1.2
+
+  # Preferencias
+  shared_preferences: ^2.3.2
+
+  # Internacionalización y fechas
+  intl: ^0.19.0
+
+  # Procesamiento de imágenes
+  image: ^4.2.0
+
+  # Almacenamiento seguro
+  flutter_secure_storage: ^9.2.2
+
+  # Navegación
+  go_router: ^14.3.0
+
+  # Utilidades HTTP
+  http_parser: ^4.0.2
+  uuid: ^4.5.3
+
+  # Inferencia TFLite local
+  tflite_flutter: ^0.11.0
+
+  # Sincronización en segundo plano
+  workmanager: ^0.9.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/models/

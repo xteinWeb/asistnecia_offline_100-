@@ -1,0 +1,1 @@
+Coloca tu archivo mobilefacenet.tflite aquí para la inferencia offline. Si no está presente, la aplicación utilizará un extractor de características simulado para que no falle.
