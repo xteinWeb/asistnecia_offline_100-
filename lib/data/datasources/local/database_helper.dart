@@ -240,7 +240,7 @@ class DatabaseHelper {
       {'clave': DbConstants.cfgUrlApi, 'valor': ApiConstants.defaultBaseUrl},
       {'clave': DbConstants.cfgFrecuenciaSync, 'valor': '15'},
       {'clave': DbConstants.cfgUnidadNegocio, 'valor': 'Principal'},
-      {'clave': DbConstants.cfgUmbralFacial, 'valor': '0.85'},
+      {'clave': DbConstants.cfgUmbralFacial, 'valor': '0.6'},
       {'clave': DbConstants.cfgPermitirManual, 'valor': '0'},
     ];
     for (final entry in defaults) {
@@ -848,7 +848,7 @@ class DatabaseHelper {
       }
       if (!keys.contains(DbConstants.cfgUmbralFacial)) {
         list.add(
-          ConfiguracionModel(clave: DbConstants.cfgUmbralFacial, valor: '0.85'),
+          ConfiguracionModel(clave: DbConstants.cfgUmbralFacial, valor: '0.6'),
         );
       }
       return list;

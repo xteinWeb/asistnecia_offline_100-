@@ -55,7 +55,9 @@ class FaceRecognizerService {
   }) async {
     // 1. Intentar extraer vector desde el backend Node.js API (mantiene compatibilidad 128-d con SQLite sincronizado)
     try {
-      final baseUrl = await _db.getConfig(DbConstants.cfgUrlApi) ?? ApiConstants.defaultBaseUrl;
+      final baseUrl =
+          await _db.getConfig(DbConstants.cfgUrlApi) ??
+          ApiConstants.defaultBaseUrl;
       final uri = Uri.parse('$baseUrl${ApiConstants.nuevoEmpleado}');
       final file = File(imagePath);
       if (await file.exists()) {
@@ -66,13 +68,21 @@ class FaceRecognizerService {
           if (originalImage != null) {
             final orientedImage = img.bakeOrientation(originalImage);
             final tempDir = Directory.systemTemp;
-            final tempFile = File('${tempDir.path}/temp_face_api_${DateTime.now().millisecondsSinceEpoch}.jpg');
-            await tempFile.writeAsBytes(img.encodeJpg(orientedImage, quality: 90));
+            final tempFile = File(
+              '${tempDir.path}/temp_face_api_${DateTime.now().millisecondsSinceEpoch}.jpg',
+            );
+            await tempFile.writeAsBytes(
+              img.encodeJpg(orientedImage, quality: 90),
+            );
             uploadFile = tempFile;
-            print('=== DIAGNOSTICO: Imagen rotada segun EXIF y guardada en temporal para la API ===');
+            print(
+              '=== DIAGNOSTICO: Imagen rotada segun EXIF y guardada en temporal para la API ===',
+            );
           }
         } catch (rotError) {
-          print('=== ADVERTENCIA: Error al rotar la imagen segun EXIF: $rotError ===');
+          print(
+            '=== ADVERTENCIA: Error al rotar la imagen segun EXIF: $rotError ===',
+          );
         }
 
         final request = http.MultipartRequest('POST', uri);
@@ -115,11 +125,15 @@ class FaceRecognizerService {
             return vector;
           }
         } else {
-          print('=== ERROR API DE EXTRACCION: Status: ${response.statusCode}, Body: ${response.body} ===');
+          print(
+            '=== ERROR API DE EXTRACCION: Status: ${response.statusCode}, Body: ${response.body} ===',
+          );
         }
       }
     } catch (e, stack) {
-      final baseUrl = await _db.getConfig(DbConstants.cfgUrlApi) ?? ApiConstants.defaultBaseUrl;
+      final baseUrl =
+          await _db.getConfig(DbConstants.cfgUrlApi) ??
+          ApiConstants.defaultBaseUrl;
       final targetUri = '$baseUrl${ApiConstants.nuevoEmpleado}';
       print('=== ERROR AL CONECTAR A LA API ($targetUri): $e ===');
       print(stack);
@@ -170,11 +184,15 @@ class FaceRecognizerService {
       }
 
       // Obtener las dimensiones esperadas del modelo TFLite de forma dinámica
-      final inputShape = _interpreter!.getInputTensor(0).shape; // e.g. [1, 160, 160, 3]
+      final inputShape = _interpreter!
+          .getInputTensor(0)
+          .shape; // e.g. [1, 160, 160, 3]
       final int modelHeight = inputShape[1];
       final int modelWidth = inputShape[2];
 
-      final outputShape = _interpreter!.getOutputTensor(0).shape; // e.g. [1, 128]
+      final outputShape = _interpreter!
+          .getOutputTensor(0)
+          .shape; // e.g. [1, 128]
       final int outDim = outputShape[1];
 
       // 3. Redimensionar al tamaño dinámico del modelo (ej. 160x160 para Facenet)
@@ -223,7 +241,9 @@ class FaceRecognizerService {
         }
       }
 
-      print('=== INFERENCIA TFLITE LOCAL: Vector generado offline con exito (dimension: ${localVector.length}) ===');
+      print(
+        '=== INFERENCIA TFLITE LOCAL: Vector generado offline con exito (dimension: ${localVector.length}) ===',
+      );
       return localVector;
     } catch (e) {
       print('Error en inferencia facial TFLite local: $e');
@@ -240,7 +260,7 @@ class FaceRecognizerService {
     required List<double> vectorDetectado,
     required List<Empleado> empleadosActivos,
     double threshold =
-        0.85, // Umbral para la distancia Euclidiana L2 normalizada
+        0.6, // Umbral para la distancia Euclidiana L2 normalizada
   }) async {
     if (empleadosActivos.isEmpty) return null;
 

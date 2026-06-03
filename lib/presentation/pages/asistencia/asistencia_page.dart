@@ -808,7 +808,7 @@ class _AsistenciaPageState extends State<AsistenciaPage> {
 
     // Cargar configuraciones actuales
     final url = await db.getConfig(DbConstants.cfgUrlApi) ?? '';
-    final umbral = await db.getConfig(DbConstants.cfgUmbralFacial) ?? '0.85';
+    final umbral = await db.getConfig(DbConstants.cfgUmbralFacial) ?? '0.6';
     final permitir = await db.getConfig(DbConstants.cfgPermitirManual) ?? '0';
     final unidad =
         await db.getConfig(DbConstants.cfgUnidadNegocio) ?? 'Principal';
@@ -896,7 +896,7 @@ class _AsistenciaPageState extends State<AsistenciaPage> {
                             labelText: 'Umbral Facial (L2 Distance)',
                             labelStyle: TextStyle(color: Colors.white70),
                             helperText:
-                                'Menor valor exige más parecido. Recomendado: 0.85',
+                                'Menor valor exige más parecido. Recomendado: 0.6',
                             helperStyle: TextStyle(
                               color: Colors.white54,
                               fontSize: 10,

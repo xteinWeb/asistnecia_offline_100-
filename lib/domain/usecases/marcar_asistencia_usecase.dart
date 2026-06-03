@@ -10,21 +10,26 @@ class MarcarAsistenciaUseCase {
 
   MarcarAsistenciaUseCase({DatabaseHelper? db}) : _db = db ?? DatabaseHelper();
 
-  Future<({EmpleadoModel empleado, double distancia})?> identificarEmpleado(List<double> vectorDetectado) async {
+  Future<({EmpleadoModel empleado, double distancia})?> identificarEmpleado(
+    List<double> vectorDetectado,
+  ) async {
     if (vectorDetectado.isEmpty) return null;
 
     final all = await _db.getAllEmpleados();
     final empleados = all.where((e) => e.estado == 'ACTIVO').toList();
-    print('=== DIAGNOSTICO BIOMETRICO: Comparando contra ${empleados.length} empleados activos ===');
+    print(
+      '=== DIAGNOSTICO BIOMETRICO: Comparando contra ${empleados.length} empleados activos ===',
+    );
     if (empleados.isEmpty) {
       print('=== DIAGNOSTICO: No hay empleados activos en SQLite ===');
       return null;
     }
 
     final umbralStr = await _db.getConfig('umbral_facial') ?? '0.6';
-    final umbral = double.tryParse(umbralStr) ?? AppConstants.faceMatchThreshold;
+    final umbral =
+        double.tryParse(umbralStr) ?? AppConstants.faceMatchThreshold;
     print('=== DIAGNOSTICO: Umbral facial configurado: $umbral ===');
-    
+
     EmpleadoModel? bestEmpleado;
     double bestDistance = double.infinity;
 
@@ -32,15 +37,21 @@ class MarcarAsistenciaUseCase {
       final empleado = empleados[i];
       final vector = empleado.mapaVectorFoto;
       if (vector.isEmpty) {
-        print('=== DIAGNOSTICO: Empleado ${empleado.nombre} (${empleado.cedula}) sin firma facial ===');
+        print(
+          '=== DIAGNOSTICO: Empleado ${empleado.nombre} (${empleado.cedula}) sin firma facial ===',
+        );
         continue;
       }
       if (vector.length != vectorDetectado.length) {
-        print('=== DIAGNOSTICO: Mismatch de tamano para ${empleado.nombre}: BD ${vector.length} d vs Detectado ${vectorDetectado.length} d ===');
+        print(
+          '=== DIAGNOSTICO: Mismatch de tamano para ${empleado.nombre}: BD ${vector.length} d vs Detectado ${vectorDetectado.length} d ===',
+        );
         continue;
       }
       final distance = FaceMatcher.euclideanDistance(vectorDetectado, vector);
-      print('=== DIAGNOSTICO: Distancia a ${empleado.nombre} (${empleado.cedula}): $distance ===');
+      print(
+        '=== DIAGNOSTICO: Distancia a ${empleado.nombre} (${empleado.cedula}): $distance ===',
+      );
       if (distance < bestDistance) {
         bestDistance = distance;
         bestEmpleado = empleado;
@@ -48,11 +59,15 @@ class MarcarAsistenciaUseCase {
     }
 
     if (bestEmpleado != null && bestDistance <= umbral) {
-      print('=== DIAGNOSTICO: Coincidencia encontrada! ${bestEmpleado.nombre} con distancia $bestDistance ===');
+      print(
+        '=== DIAGNOSTICO: Coincidencia encontrada! ${bestEmpleado.nombre} con distancia $bestDistance ===',
+      );
       return (empleado: bestEmpleado, distancia: bestDistance);
     }
-    
-    print('=== DIAGNOSTICO: Ningun empleado supero el umbral. Mejor distancia: $bestDistance a ${bestEmpleado?.nombre} ===');
+
+    print(
+      '=== DIAGNOSTICO: Ningun empleado supero el umbral. Mejor distancia: $bestDistance a ${bestEmpleado?.nombre} ===',
+    );
     return null;
   }
 
@@ -76,22 +91,37 @@ class MarcarAsistenciaUseCase {
     if (tipoSeleccionado == TipoRegistro.permiso) {
       final permiso = await _db.getPermisoActivoByCedula(empleado.cedula);
       if (permiso == null) {
-        return MarcarAsistenciaResult.error('No hay permiso autorizado registrado hoy para este usuario.');
+        return MarcarAsistenciaResult.error(
+          'No hay permiso autorizado registrado hoy para este usuario.',
+        );
       }
-      final yaTieneEntrada = registrosHoy.any((r) => r.evento == AppConstants.eventoEntrada);
-      evento = yaTieneEntrada ? AppConstants.eventoSalida : AppConstants.eventoEntrada;
+      final yaTieneEntrada = registrosHoy.any(
+        (r) => r.evento == AppConstants.eventoEntrada,
+      );
+      evento = yaTieneEntrada
+          ? AppConstants.eventoSalida
+          : AppConstants.eventoEntrada;
       descripcion = 'Marcación por Permiso Autorizado registrada con éxito.';
     } else {
-      final yaTieneEntrada = registrosHoy.any((r) => r.tipo == TipoRegistro.normal.name.toUpperCase() || 
-                                                     r.tipo == TipoRegistro.retardo.name.toUpperCase());
-      final yaTieneSalida = registrosHoy.any((r) => r.tipo == TipoRegistro.salida.name.toUpperCase());
-      final yaTieneAlmuerzo = registrosHoy.any((r) => r.tipo == TipoRegistro.almuerzo.name.toUpperCase());
+      final yaTieneEntrada = registrosHoy.any(
+        (r) =>
+            r.tipo == TipoRegistro.normal.name.toUpperCase() ||
+            r.tipo == TipoRegistro.retardo.name.toUpperCase(),
+      );
+      final yaTieneSalida = registrosHoy.any(
+        (r) => r.tipo == TipoRegistro.salida.name.toUpperCase(),
+      );
+      final yaTieneAlmuerzo = registrosHoy.any(
+        (r) => r.tipo == TipoRegistro.almuerzo.name.toUpperCase(),
+      );
 
       switch (tipoSeleccionado) {
         case TipoRegistro.normal:
         case TipoRegistro.retardo:
           if (yaTieneEntrada) {
-            return MarcarAsistenciaResult.error('Registro Inválido: Ya has registrado tu Entrada el día de hoy.');
+            return MarcarAsistenciaResult.error(
+              'Registro Inválido: Ya has registrado tu Entrada el día de hoy.',
+            );
           }
           evento = AppConstants.eventoEntrada;
           descripcion = '¡Bienvenido! Entrada registrada correctamente.';
@@ -99,33 +129,50 @@ class MarcarAsistenciaUseCase {
 
         case TipoRegistro.almuerzo:
           if (!yaTieneEntrada) {
-            return MarcarAsistenciaResult.error('Registro Inválido: No puedes registrar Almuerzo sin antes registrar Entrada hoy.');
+            return MarcarAsistenciaResult.error(
+              'Registro Inválido: No puedes registrar Almuerzo sin antes registrar Entrada hoy.',
+            );
           }
           if (yaTieneSalida) {
-            return MarcarAsistenciaResult.error('Registro Inválido: Ya has registrado la Salida de tu jornada hoy.');
+            return MarcarAsistenciaResult.error(
+              'Registro Inválido: Ya has registrado la Salida de tu jornada hoy.',
+            );
           }
-          evento = yaTieneAlmuerzo ? AppConstants.eventoEntrada : AppConstants.eventoSalida;
-          descripcion = yaTieneAlmuerzo ? 'Retorno de almuerzo registrado.' : 'Salida a almuerzo registrada.';
+          evento = yaTieneAlmuerzo
+              ? AppConstants.eventoEntrada
+              : AppConstants.eventoSalida;
+          descripcion = yaTieneAlmuerzo
+              ? 'Retorno de almuerzo registrado.'
+              : 'Salida a almuerzo registrada.';
           break;
 
         case TipoRegistro.salida:
           if (!yaTieneEntrada) {
-            return MarcarAsistenciaResult.error('Registro Inválido: No puedes registrar Salida sin antes haber marcado tu Entrada hoy.');
+            return MarcarAsistenciaResult.error(
+              'Registro Inválido: No puedes registrar Salida sin antes haber marcado tu Entrada hoy.',
+            );
           }
           if (yaTieneSalida) {
-            return MarcarAsistenciaResult.error('Registro Inválido: Ya has marcado tu Salida final por el día de hoy.');
+            return MarcarAsistenciaResult.error(
+              'Registro Inválido: Ya has marcado tu Salida final por el día de hoy.',
+            );
           }
           evento = AppConstants.eventoSalida;
-          descripcion = 'Salida de jornada registrada correctamente. ¡Hasta mañana!';
+          descripcion =
+              'Salida de jornada registrada correctamente. ¡Hasta mañana!';
           break;
 
         case TipoRegistro.extras:
-          evento = yaTieneEntrada ? AppConstants.eventoSalida : AppConstants.eventoEntrada;
+          evento = yaTieneEntrada
+              ? AppConstants.eventoSalida
+              : AppConstants.eventoEntrada;
           descripcion = 'Marcación de Horas Extras registrada correctamente.';
           break;
 
         default:
-          return MarcarAsistenciaResult.error('Tipo de registro no soportado en marcado manual.');
+          return MarcarAsistenciaResult.error(
+            'Tipo de registro no soportado en marcado manual.',
+          );
       }
     }
 
@@ -158,7 +205,7 @@ class MarcarAsistenciaUseCase {
     if (match == null) {
       return MarcarAsistenciaResult.error('Empleado no reconocido.');
     }
-    
+
     return registrarMarcadoManual(
       empleado: match.empleado,
       tipoSeleccionado: TipoRegistro.normal,
@@ -188,11 +235,8 @@ class MarcarAsistenciaResult {
     this.error,
   });
 
-  factory MarcarAsistenciaResult.error(String error) => MarcarAsistenciaResult(
-        registrado: false,
-        mensaje: error,
-        error: error,
-      );
+  factory MarcarAsistenciaResult.error(String error) =>
+      MarcarAsistenciaResult(registrado: false, mensaje: error, error: error);
 
   bool get hasError => error != null;
 }
