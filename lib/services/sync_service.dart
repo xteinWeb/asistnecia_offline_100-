@@ -142,6 +142,9 @@ class SyncService {
       final pullP = await _pullPermisos(baseUrl);
       errors.addAll(pullP);
 
+      final pullR = await _pullRegistros(baseUrl);
+      errors.addAll(pullR);
+
       return SyncResult(
         registros: registrosSynced,
         permisos: permisosSynced,
@@ -368,6 +371,32 @@ class SyncService {
       }
     } catch (e) {
       errors.add('Excepción pull permisos: $e');
+    }
+    return errors;
+  }
+
+  Future<List<String>> _pullRegistros(String baseUrl) async {
+    final errors = <String>[];
+    try {
+      final uri = Uri.parse('$baseUrl/api/sync/registros');
+      final response = await http.get(uri).timeout(const Duration(milliseconds: ApiConstants.receiveTimeoutMs));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        if (body['success'] == true) {
+          final data = body['data'] as List;
+          for (final item in data) {
+            final map = Map<String, dynamic>.from(item);
+            map['sincronizado'] = 1;
+            final registro = RegistroModel.fromJson(map);
+            await _db.insertRegistro(registro);
+          }
+        }
+      } else {
+        errors.add('Error pull registros: ${response.statusCode}');
+      }
+    } catch (e) {
+      errors.add('Excepción pull registros: $e');
     }
     return errors;
   }

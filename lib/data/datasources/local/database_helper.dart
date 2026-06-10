@@ -15,6 +15,7 @@ import '../../models/registro_model.dart';
 import '../../models/usuario_model.dart';
 import '../../models/permiso_model.dart';
 import '../../models/configuracion_model.dart';
+import 'package:totem_asistencia_offline/domain/entities/horario.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -100,10 +101,26 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE ${DbConstants.tableHorarios} (
         id_horario  TEXT PRIMARY KEY,
-        hora_inicio TEXT NOT NULL,
-        hora_final  TEXT NOT NULL,
+        descripcion TEXT NOT NULL,
+        estado      TEXT NOT NULL DEFAULT 'ACTIVO'
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE itm_horarios (
+        id_horario  TEXT NOT NULL,
+        item        INTEGER NOT NULL,
+        inicio      TEXT NOT NULL,
+        final       TEXT NOT NULL,
+        lunes       INTEGER NOT NULL,
+        martes      INTEGER NOT NULL,
+        miercoles   INTEGER NOT NULL,
+        jueves      INTEGER NOT NULL,
+        viernes     INTEGER NOT NULL,
+        sabado      INTEGER NOT NULL,
+        domingo     INTEGER NOT NULL,
         tipo        TEXT NOT NULL,
-        dias        TEXT NOT NULL
+        PRIMARY KEY (id_horario, item)
       )
     ''');
 
@@ -231,6 +248,41 @@ class DatabaseHelper {
         );
       } catch (e) {
         debugPrint('Error al agregar columna estado en SQLite: $e');
+      }
+    }
+    if (oldVersion < 5) {
+      try {
+        await db.execute('PRAGMA foreign_keys = OFF');
+        await db.execute('DROP TABLE IF EXISTS ${DbConstants.tableHorarios}');
+        await db.execute('''
+          CREATE TABLE ${DbConstants.tableHorarios} (
+            id_horario  TEXT PRIMARY KEY,
+            descripcion TEXT NOT NULL,
+            estado      TEXT NOT NULL DEFAULT 'ACTIVO'
+          )
+        ''');
+        
+        await db.execute('DROP TABLE IF EXISTS itm_horarios');
+        await db.execute('''
+          CREATE TABLE itm_horarios (
+            id_horario  TEXT NOT NULL,
+            item        INTEGER NOT NULL,
+            inicio      TEXT NOT NULL,
+            final       TEXT NOT NULL,
+            lunes       INTEGER NOT NULL,
+            martes      INTEGER NOT NULL,
+            miercoles   INTEGER NOT NULL,
+            jueves      INTEGER NOT NULL,
+            viernes     INTEGER NOT NULL,
+            sabado      INTEGER NOT NULL,
+            domingo     INTEGER NOT NULL,
+            tipo        TEXT NOT NULL,
+            PRIMARY KEY (id_horario, item)
+          )
+        ''');
+        await db.execute('PRAGMA foreign_keys = ON');
+      } catch (e) {
+        debugPrint('Error al migrar horarios a version 5: $e');
       }
     }
   }
@@ -369,14 +421,7 @@ class DatabaseHelper {
 
   Future<int> insertHorario(HorarioModel horario) async {
     if (kIsWeb) {
-      final baseUrl =
-          await getConfig(DbConstants.cfgUrlApi) ?? ApiConstants.defaultBaseUrl;
-      final response = await http.post(
-        Uri.parse('$baseUrl/api/sync/horarios'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode([horario.toMap()]),
-      );
-      return response.statusCode == 200 || response.statusCode == 201 ? 1 : 0;
+      return 1;
     }
 
     final db = await database;
@@ -384,11 +429,29 @@ class DatabaseHelper {
     if (map['id_horario'] == null) {
       map['id_horario'] = const Uuid().v4();
     }
-    return db.insert(
+    final id = map['id_horario'] as String;
+
+    await db.insert(
       DbConstants.tableHorarios,
       map,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+
+    await db.delete(
+      'itm_horarios',
+      where: 'id_horario = ?',
+      whereArgs: [id],
+    );
+
+    for (final item in horario.items) {
+      await db.insert(
+        'itm_horarios',
+        item.toMap(id),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
+    return 1;
   }
 
   Future<HorarioModel?> getHorarioById(String id) async {
@@ -405,7 +468,16 @@ class DatabaseHelper {
       whereArgs: [id],
     );
     if (rows.isEmpty) return null;
-    return HorarioModel.fromMap(rows.first);
+
+    final itemRows = await db.query(
+      'itm_horarios',
+      where: 'id_horario = ?',
+      whereArgs: [id],
+      orderBy: 'item ASC',
+    );
+
+    final items = itemRows.map(HorarioItem.fromMap).toList();
+    return HorarioModel.fromMap(rows.first, items: items);
   }
 
   Future<List<HorarioModel>> getAllHorarios() async {
@@ -416,7 +488,7 @@ class DatabaseHelper {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final list = (data['data'] as List)
-            .map((h) => HorarioModel.fromMap(Map<String, dynamic>.from(h)))
+            .map((h) => HorarioModel.fromJson(Map<String, dynamic>.from(h)))
             .toList();
         return list;
       }
@@ -431,26 +503,26 @@ class DatabaseHelper {
       whereArgs: [''],
     );
     if (nullRows.isNotEmpty) {
-      for (final row in nullRows) {
-        final newId = const Uuid().v4();
-        await db.update(
-          DbConstants.tableHorarios,
-          {'id_horario': newId},
-          where:
-              '(id_horario IS NULL OR id_horario = ?) AND tipo = ? AND hora_inicio = ? AND hora_final = ? AND dias = ?',
-          whereArgs: [
-            '',
-            row['tipo'],
-            row['hora_inicio'],
-            row['hora_final'],
-            row['dias'],
-          ],
-        );
-      }
+      await db.delete(
+        DbConstants.tableHorarios,
+        where: 'id_horario IS NULL OR id_horario = ?',
+        whereArgs: [''],
+      );
     }
 
     final rows = await db.query(DbConstants.tableHorarios);
-    return rows.map(HorarioModel.fromMap).toList();
+    final allItemsRows = await db.query('itm_horarios', orderBy: 'item ASC');
+
+    final Map<String, List<HorarioItem>> itemsMap = {};
+    for (final r in allItemsRows) {
+      final id = r['id_horario'] as String;
+      itemsMap.putIfAbsent(id, () => []).add(HorarioItem.fromMap(r));
+    }
+
+    return rows.map((row) {
+      final id = row['id_horario'] as String;
+      return HorarioModel.fromMap(row, items: itemsMap[id] ?? []);
+    }).toList();
   }
 
   Future<int> deleteHorario(String id) async {
@@ -459,6 +531,11 @@ class DatabaseHelper {
     }
 
     final db = await database;
+    await db.delete(
+      'itm_horarios',
+      where: 'id_horario = ?',
+      whereArgs: [id],
+    );
     return db.delete(
       DbConstants.tableHorarios,
       where: 'id_horario = ?',

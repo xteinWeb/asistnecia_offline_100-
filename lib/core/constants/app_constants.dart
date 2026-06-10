@@ -1,7 +1,9 @@
 class AppConstants {
   // Reconocimiento facial
-  static const double faceMatchThreshold = 0.85; // Ajustado para distancia Euclidiana en TFLite local
-  static const int faceVectorDimensions = 192; // Usualmente 192 para MobileFaceNet
+  static const double faceMatchThreshold =
+      0.6; // Ajustado para distancia Euclidiana en TFLite local
+  static const int faceVectorDimensions =
+      192; // Usualmente 192 para MobileFaceNet
 
   // Horarios
   static const int toleranciaRetardoMinutos = 15;

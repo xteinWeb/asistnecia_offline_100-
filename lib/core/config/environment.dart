@@ -3,13 +3,13 @@ import 'package:flutter/foundation.dart';
 enum AppEnvironment { dev, prod }
 
 class Environment {
-  static const AppEnvironment active = AppEnvironment.dev;
+  static const AppEnvironment active = AppEnvironment.prod;
 
   // URL del servidor de desarrollo (Local). Mapeada al puerto 8085 según la configuración de Fortinet y Docker Compose.
-  static const String devBaseUrl = 'http://192.168.11.46:8085';
+  static const String devBaseUrl = 'http://181.79.25.235:8085';
 
   // URL del servidor de producción.
-  static const String prodBaseUrl = 'https://tu-api-produccion.com';
+  static const String prodBaseUrl = 'http://181.79.25.235:8085';
 
   static String get apiUrl {
     if (kIsWeb) {

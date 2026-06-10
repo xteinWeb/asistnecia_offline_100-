@@ -1322,603 +1322,695 @@ class _AsistenciaPageState extends State<AsistenciaPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.kioskBackground,
-      appBar: AppBar(
-        title: const Text('Tótem de Asistencia'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.psychology_outlined, color: Colors.white30),
-            tooltip: 'Simular marcación (Offline Debug)',
-            onPressed: _procesando ? null : _simularEscaneoFacial,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          StreamBuilder<DateTime>(
-            stream: _clockStream,
-            builder: (context, snap) {
-              final now = snap.data ?? DateTime.now();
-              return GestureDetector(
-                onDoubleTap: _mostrarLoginAdministrador,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  color: Colors.transparent,
-                  child: Column(
-                    children: [
-                      Text(
-                        DateFormat('HH:mm:ss').format(now),
-                        style: const TextStyle(
-                          fontSize: 64,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        DateFormat(
-                          'EEEE, d \'de\' MMMM \'de\' yyyy',
-                          'es',
-                        ).format(now).toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
 
-          Expanded(
-            child: Center(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 32),
-                decoration: BoxDecoration(
-                  color: AppColors.kioskSurface,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.white24, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.4),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
+    // --- ELEMENTOS COMPARTIDOS ---
+
+    // 1. Reloj / Fecha
+    Widget buildClockSection() {
+      return StreamBuilder<DateTime>(
+        stream: _clockStream,
+        builder: (context, snap) {
+          final now = snap.data ?? DateTime.now();
+          return GestureDetector(
+            onDoubleTap: _mostrarLoginAdministrador,
+            child: Container(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              color: Colors.transparent,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormat('HH:mm:ss').format(now),
+                    style: TextStyle(
+                      fontSize: isLandscape ? 36 : 30,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 2,
                     ),
-                  ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    DateFormat(
+                      'EEEE, d \'de\' MMMM \'de\' yyyy',
+                      'es',
+                    ).format(now).toUpperCase(),
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: isLandscape ? 11 : 10,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    // 2. Panel de Información (Izquierda en Landscape / Abajo en Portrait)
+    Widget buildInfoPanel() {
+      final hasIdentified =
+          _mostrarPanelSeleccion && _empleadoIdentificado != null;
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        decoration: BoxDecoration(
+          color: _state.mensajeColor.withOpacity(isLandscape ? 0.0 : 0.12),
+          borderRadius: isLandscape ? BorderRadius.circular(16) : null,
+          border: isLandscape
+              ? Border.all(color: _state.mensajeColor.withOpacity(0.15))
+              : Border(
+                  top: BorderSide(
+                    color: _state.mensajeColor.withOpacity(0.3),
+                    width: 2,
+                  ),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(22),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      if (_isCameraInitialized &&
-                          _cameraController != null &&
-                          _capturedImage == null)
-                        Positioned.fill(
-                          child: AspectRatio(
-                            aspectRatio: _cameraController!.value.aspectRatio,
-                            child: CameraPreview(_cameraController!),
-                          ),
-                        ),
+        ),
+        child: hasIdentified
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '¡ROSTRO IDENTIFICADO!'.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: _state.mensajeColor,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _empleadoIdentificado!.nombre,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'CÉDULA: ${_empleadoIdentificado!.cedula}',
+                    style: const TextStyle(color: Colors.white60, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  Builder(
+                    builder: (context) {
+                      final yaTieneEntrada = _registrosHoy.any(
+                        (r) =>
+                            r.tipo == TipoRegistro.normal.name.toUpperCase() ||
+                            r.tipo == TipoRegistro.retardo.name.toUpperCase(),
+                      );
+                      final yaTieneSalida = _registrosHoy.any(
+                        (r) => r.tipo == TipoRegistro.salida.name.toUpperCase(),
+                      );
+                      final yaTieneAlmuerzo = _registrosHoy.any(
+                        (r) =>
+                            r.tipo == TipoRegistro.almuerzo.name.toUpperCase(),
+                      );
 
-                      if (_capturedImage != null)
-                        Positioned.fill(
-                          child: Image.file(
-                            File(_capturedImage!.path),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
+                      String statusText = 'Secuencia: Esperando Entrada';
+                      if (yaTieneEntrada) {
+                        statusText =
+                            'Secuencia: Dentro / Esperando Almuerzo o Salida';
+                      }
+                      if (yaTieneAlmuerzo) {
+                        statusText =
+                            'Secuencia: En Almuerzo / Esperando Retorno';
+                      }
+                      if (yaTieneSalida) {
+                        statusText = 'Secuencia: Jornada Finalizada';
+                      }
 
-                      if (!_isCameraInitialized && _capturedImage == null)
-                        const Positioned.fill(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.videocam_off_outlined,
-                                size: 100,
-                                color: Colors.white10,
-                              ),
-                              SizedBox(height: 16),
-                              Text(
-                                'CÁMARA DEL TÓTEM INICIALIZANDO...',
-                                style: TextStyle(
-                                  color: Colors.white30,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.5,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
+                      return Text(
+                        statusText,
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 11,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_state.procesando) ...[
+                    const CircularProgressIndicator(color: AppColors.info),
+                    const SizedBox(height: 16),
+                  ] else ...[
+                    Icon(
+                      _state.empleadoNombre != null
+                          ? Icons.check_circle_outline
+                          : Icons.sensors_rounded,
+                      size: 40,
+                      color: _state.mensajeColor,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  Text(
+                    _state.mensaje.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: _state.mensajeColor,
+                      letterSpacing: 1.2,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (_state.empleadoNombre != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _state.empleadoNombre!,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'CÉDULA: ${_state.empleadoCedula}',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                    if (_state.tipoRegistro != null) ...[
+                      const SizedBox(height: 12),
+                      Chip(
+                        backgroundColor: _state.mensajeColor.withOpacity(0.2),
+                        label: Text(
+                          _getTipoRegistroLabel(_state.tipoRegistro!),
+                          style: TextStyle(
+                            color: _state.mensajeColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
                           ),
                         ),
-
-                      if (_isCameraInitialized &&
-                          _cameraController != null &&
-                          _capturedImage == null &&
-                          !_procesando)
-                        Positioned.fill(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: AppColors.secondary.withOpacity(0.3),
-                                width: 3,
-                              ),
-                              borderRadius: BorderRadius.circular(22),
-                            ),
-                            child: Center(
-                              child: Container(
-                                width: 180,
-                                height: 180,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: AppColors.secondary.withOpacity(0.7),
-                                    width: 2,
-                                    style: BorderStyle.solid,
-                                  ),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                      if (_procesando)
-                        Positioned.fill(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  AppColors.secondary.withOpacity(0.0),
-                                  AppColors.secondary.withOpacity(0.1),
-                                  AppColors.secondary.withOpacity(0.3),
-                                  AppColors.secondary.withOpacity(0.1),
-                                  AppColors.secondary.withOpacity(0.0),
-                                ],
-                                stops: const [0.0, 0.4, 0.5, 0.6, 1.0],
-                              ),
-                            ),
-                          ),
-                        ),
-
-                      if (_procesando && _state.mensaje.contains('PARPADEA'))
-                        Positioned.fill(
-                          child: Container(
-                            color: Colors.black.withOpacity(0.75),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    const SizedBox(
-                                      width: 110,
-                                      height: 110,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 5,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              AppColors.secondaryLight,
-                                            ),
-                                      ),
-                                    ),
-                                    Icon(
-                                      Icons.remove_red_eye_rounded,
-                                      size: 56,
-                                      color: AppColors.secondaryLight,
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 24),
-                                const Text(
-                                  '¡PRUEBA DE SEGURIDAD!',
-                                  style: TextStyle(
-                                    color: AppColors.secondaryLight,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 2,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                const Text(
-                                  '👀 ¡PARPADEE VARIAS VECES! 👀',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1,
-                                    shadows: [
-                                      Shadow(
-                                        blurRadius: 15,
-                                        color: AppColors.secondary,
-                                        offset: Offset(0, 0),
-                                      ),
-                                    ],
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 14),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white10,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: Colors.white12),
-                                  ),
-                                  child: const Text(
-                                    'Parpadee de forma continua frente a la cámara',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-
-                      if (!_mostrarPanelSeleccion && !_procesando)
-                        Positioned(
-                          bottom: 24,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ElevatedButton.icon(
-                                onPressed: (!_isCameraInitialized)
-                                    ? null
-                                    : _marcarAsistenciaReal,
-                                icon: const Icon(Icons.face_unlock_rounded),
-                                label: const Text('MARCAR CON ROSTRO'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.secondary,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 32,
-                                    vertical: 18,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                  elevation: 8,
-                                  textStyle: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1,
-                                  ),
-                                ),
-                              ),
-                              if (_permitirManual) ...[
-                                const SizedBox(height: 10),
-                                OutlinedButton.icon(
-                                  onPressed: _mostrarDialogoMarcacionOffline,
-                                  icon: const Icon(
-                                    Icons.keyboard_alt_outlined,
-                                    color: Colors.white70,
-                                  ),
-                                  label: const Text(
-                                    'MARCAR CON CÉDULA (OFFLINE)',
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.white70,
-                                    side: const BorderSide(
-                                      color: Colors.white24,
-                                      width: 2,
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 24,
-                                      vertical: 12,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                    textStyle: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
+                        side: BorderSide(color: _state.mensajeColor),
+                      ),
                     ],
+                    if (_state.distancia != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Precisión facial: ${(100 - _state.distancia! * 100).toStringAsFixed(1)}% (dist. ${_state.distancia!.toStringAsFixed(3)})',
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+      );
+    }
+
+    // 3. Panel de Opciones/Botones (Derecha en Landscape / Abajo en Portrait)
+    Widget buildOptionsPanel() {
+      final hasIdentified =
+          _mostrarPanelSeleccion && _empleadoIdentificado != null;
+      if (hasIdentified) {
+        final yaTieneEntrada = _registrosHoy.any(
+          (r) =>
+              r.tipo == TipoRegistro.normal.name.toUpperCase() ||
+              r.tipo == TipoRegistro.retardo.name.toUpperCase(),
+        );
+        final yaTieneSalida = _registrosHoy.any(
+          (r) => r.tipo == TipoRegistro.salida.name.toUpperCase(),
+        );
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              direction: isLandscape ? Axis.vertical : Axis.horizontal,
+              children: [
+                SizedBox(
+                  width: isLandscape ? 160 : null,
+                  child: _buildBotonPanel(
+                    label: 'ENTRADA',
+                    icon: Icons.login_rounded,
+                    color: Colors.green,
+                    onPressed: (yaTieneEntrada || _procesando)
+                        ? null
+                        : () => _registrarMarcacionManual(TipoRegistro.normal),
+                  ),
+                ),
+                SizedBox(
+                  width: isLandscape ? 160 : null,
+                  child: _buildBotonPanel(
+                    label: 'ALMUERZO',
+                    icon: Icons.restaurant_rounded,
+                    color: Colors.orange,
+                    onPressed: (!yaTieneEntrada || yaTieneSalida || _procesando)
+                        ? null
+                        : () =>
+                              _registrarMarcacionManual(TipoRegistro.almuerzo),
+                  ),
+                ),
+                SizedBox(
+                  width: isLandscape ? 160 : null,
+                  child: _buildBotonPanel(
+                    label: 'SALIDA',
+                    icon: Icons.logout_rounded,
+                    color: Colors.red,
+                    onPressed: (!yaTieneEntrada || yaTieneSalida || _procesando)
+                        ? null
+                        : () => _registrarMarcacionManual(TipoRegistro.salida),
+                  ),
+                ),
+                SizedBox(
+                  width: isLandscape ? 160 : null,
+                  child: _buildBotonPanel(
+                    label: 'PERMISO',
+                    icon: Icons.card_membership_rounded,
+                    color: Colors.purple,
+                    onPressed: _procesando
+                        ? null
+                        : () => _registrarMarcacionManual(TipoRegistro.permiso),
+                  ),
+                ),
+                SizedBox(
+                  width: isLandscape ? 160 : null,
+                  child: _buildBotonPanel(
+                    label: 'EXTRAS',
+                    icon: Icons.more_time_rounded,
+                    color: Colors.blue,
+                    onPressed: _procesando
+                        ? null
+                        : () => _registrarMarcacionManual(TipoRegistro.extras),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: _procesando ? null : _cancelarFlujoMarcacion,
+              icon: const Icon(
+                Icons.cancel_outlined,
+                color: Colors.white54,
+                size: 14,
+              ),
+              label: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.white54, fontSize: 11),
+              ),
+            ),
+          ],
+        );
+      } else {
+        // Estado sin identificar rostro (Mostrar botones de escaneo)
+        if (isLandscape && !_procesando) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                onPressed: (!_isCameraInitialized)
+                    ? null
+                    : _marcarAsistenciaReal,
+                icon: const Icon(Icons.face_unlock_rounded),
+                label: const Text('MARCAR ROSTRO'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.secondary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 15,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  elevation: 6,
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: _state.mensajeColor.withOpacity(0.12),
-              border: Border(
-                top: BorderSide(
-                  color: _state.mensajeColor.withOpacity(0.3),
-                  width: 2,
+              if (_permitirManual) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _mostrarDialogoMarcacionOffline,
+                  icon: const Icon(
+                    Icons.keyboard_alt_outlined,
+                    color: Colors.white70,
+                    size: 16,
+                  ),
+                  label: const Text('USAR CÉDULA'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white70,
+                    side: const BorderSide(color: Colors.white24, width: 1.5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
                 ),
-              ),
+              ],
+            ],
+          );
+        }
+        return const SizedBox.shrink();
+      }
+    }
+
+    // 4. El Contenedor de la Cámara / Foto
+    Widget buildCameraBox() {
+      return Container(
+        width: isLandscape ? 480 : MediaQuery.sizeOf(context).width * 0.9,
+        height: isLandscape ? 480 : null,
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: AppColors.kioskSurface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white24, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.4),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: SafeArea(
-              child: _mostrarPanelSeleccion && _empleadoIdentificado != null
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              if (_isCameraInitialized &&
+                  _cameraController != null &&
+                  _capturedImage == null)
+                Positioned.fill(
+                  child: AspectRatio(
+                    aspectRatio: _cameraController!.value.aspectRatio,
+                    child: CameraPreview(_cameraController!),
+                  ),
+                ),
+              if (_capturedImage != null)
+                Positioned.fill(
+                  child: Image.file(
+                    File(_capturedImage!.path),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              if (!_isCameraInitialized && _capturedImage == null)
+                const Positioned.fill(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.videocam_off_outlined,
+                        size: 80,
+                        color: Colors.white10,
+                      ),
+                      SizedBox(height: 12),
+                      Text(
+                        'CÁMARA INICIALIZANDO...',
+                        style: TextStyle(
+                          color: Colors.white30,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (_isCameraInitialized &&
+                  _cameraController != null &&
+                  _capturedImage == null &&
+                  !_procesando)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: AppColors.secondary.withOpacity(0.3),
+                        width: 3,
+                      ),
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: isLandscape ? 200 : 150,
+                        height: isLandscape ? 200 : 150,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: AppColors.secondary.withOpacity(0.7),
+                            width: 2,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (_procesando)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          AppColors.secondary.withOpacity(0.0),
+                          AppColors.secondary.withOpacity(0.1),
+                          AppColors.secondary.withOpacity(0.3),
+                          AppColors.secondary.withOpacity(0.1),
+                          AppColors.secondary.withOpacity(0.0),
+                        ],
+                        stops: const [0.0, 0.4, 0.5, 0.6, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              if (_procesando && _state.mensaje.contains('PARPADEA'))
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withOpacity(0.75),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          '¡ROSTRO IDENTIFICADO!'.toUpperCase(),
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            const SizedBox(
+                              width: 90,
+                              height: 90,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 4,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.secondaryLight,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              Icons.remove_red_eye_rounded,
+                              size: 48,
+                              color: AppColors.secondaryLight,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          '¡PRUEBA DE SEGURIDAD!',
                           style: TextStyle(
-                            fontSize: 14,
+                            color: AppColors.secondaryLight,
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: _state.mensajeColor,
-                            letterSpacing: 1.5,
+                            letterSpacing: 2,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _empleadoIdentificado!.nombre,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
+                        const SizedBox(height: 6),
+                        const Text(
+                          '👀 ¡PARPADEE! 👀',
+                          style: TextStyle(
                             color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(
+                                blurRadius: 15,
+                                color: AppColors.secondary,
+                              ),
+                            ],
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        Text(
-                          'CÉDULA: ${_empleadoIdentificado!.cedula}',
-                          style: const TextStyle(
-                            color: Colors.white60,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-
-                        Builder(
-                          builder: (context) {
-                            final yaTieneEntrada = _registrosHoy.any(
-                              (r) =>
-                                  r.tipo ==
-                                      TipoRegistro.normal.name.toUpperCase() ||
-                                  r.tipo ==
-                                      TipoRegistro.retardo.name.toUpperCase(),
-                            );
-                            final yaTieneSalida = _registrosHoy.any(
-                              (r) =>
-                                  r.tipo ==
-                                  TipoRegistro.salida.name.toUpperCase(),
-                            );
-                            final yaTieneAlmuerzo = _registrosHoy.any(
-                              (r) =>
-                                  r.tipo ==
-                                  TipoRegistro.almuerzo.name.toUpperCase(),
-                            );
-
-                            String statusText = 'Secuencia: Esperando Entrada';
-                            if (yaTieneEntrada)
-                              statusText =
-                                  'Secuencia: Dentro / Esperando Almuerzo o Salida';
-                            if (yaTieneAlmuerzo)
-                              statusText =
-                                  'Secuencia: En Almuerzo / Esperando Retorno';
-                            if (yaTieneSalida)
-                              statusText = 'Secuencia: Jornada Finalizada';
-
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: Text(
-                                statusText,
-                                style: const TextStyle(
-                                  color: Colors.white38,
-                                  fontSize: 11,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-
-                        Builder(
-                          builder: (context) {
-                            final yaTieneEntrada = _registrosHoy.any(
-                              (r) =>
-                                  r.tipo ==
-                                      TipoRegistro.normal.name.toUpperCase() ||
-                                  r.tipo ==
-                                      TipoRegistro.retardo.name.toUpperCase(),
-                            );
-                            final yaTieneSalida = _registrosHoy.any(
-                              (r) =>
-                                  r.tipo ==
-                                  TipoRegistro.salida.name.toUpperCase(),
-                            );
-
-                            return Wrap(
-                              spacing: 8,
-                              runSpacing: 10,
-                              alignment: WrapAlignment.center,
-                              children: [
-                                _buildBotonPanel(
-                                  label: 'ENTRADA',
-                                  icon: Icons.login_rounded,
-                                  color: Colors.green,
-                                  onPressed: (yaTieneEntrada || _procesando)
-                                      ? null
-                                      : () => _registrarMarcacionManual(
-                                          TipoRegistro.normal,
-                                        ),
-                                ),
-                                _buildBotonPanel(
-                                  label: 'ALMUERZO',
-                                  icon: Icons.restaurant_rounded,
-                                  color: Colors.orange,
-                                  onPressed:
-                                      (!yaTieneEntrada ||
-                                          yaTieneSalida ||
-                                          _procesando)
-                                      ? null
-                                      : () => _registrarMarcacionManual(
-                                          TipoRegistro.almuerzo,
-                                        ),
-                                ),
-                                _buildBotonPanel(
-                                  label: 'SALIDA',
-                                  icon: Icons.logout_rounded,
-                                  color: Colors.red,
-                                  onPressed:
-                                      (!yaTieneEntrada ||
-                                          yaTieneSalida ||
-                                          _procesando)
-                                      ? null
-                                      : () => _registrarMarcacionManual(
-                                          TipoRegistro.salida,
-                                        ),
-                                ),
-                                _buildBotonPanel(
-                                  label: 'PERMISO',
-                                  icon: Icons.card_membership_rounded,
-                                  color: Colors.purple,
-                                  onPressed: _procesando
-                                      ? null
-                                      : () => _registrarMarcacionManual(
-                                          TipoRegistro.permiso,
-                                        ),
-                                ),
-                                _buildBotonPanel(
-                                  label: 'EXTRAS',
-                                  icon: Icons.more_time_rounded,
-                                  color: Colors.blue,
-                                  onPressed: _procesando
-                                      ? null
-                                      : () => _registrarMarcacionManual(
-                                          TipoRegistro.extras,
-                                        ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 12),
-
-                        TextButton.icon(
-                          onPressed: _procesando
-                              ? null
-                              : _cancelarFlujoMarcacion,
-                          icon: const Icon(
-                            Icons.cancel_outlined,
-                            color: Colors.white54,
-                            size: 16,
-                          ),
-                          label: const Text(
-                            'No soy yo, Cancelar',
-                            style: TextStyle(
-                              color: Colors.white54,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
                       ],
-                    )
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_state.procesando) ...[
-                          const CircularProgressIndicator(
-                            color: AppColors.info,
+                    ),
+                  ),
+                ),
+              if (!isLandscape && !_mostrarPanelSeleccion && !_procesando)
+                Positioned(
+                  bottom: 24,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: (!_isCameraInitialized)
+                            ? null
+                            : _marcarAsistenciaReal,
+                        icon: const Icon(Icons.face_unlock_rounded),
+                        label: const Text('MARCAR CON ROSTRO'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 30,
+                            vertical: 20,
                           ),
-                          const SizedBox(height: 16),
-                        ] else ...[
-                          Icon(
-                            _state.empleadoNombre != null
-                                ? Icons.check_circle_outline
-                                : Icons.sensors_rounded,
-                            size: 48,
-                            color: _state.mensajeColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
                           ),
-                          const SizedBox(height: 12),
-                        ],
-                        Text(
-                          _state.mensaje.toUpperCase(),
-                          style: TextStyle(
+                          elevation: 8,
+                          textStyle: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: _state.mensajeColor,
-                            letterSpacing: 1.2,
                           ),
-                          textAlign: TextAlign.center,
                         ),
-                        if (_state.empleadoNombre != null) ...[
-                          const SizedBox(height: 16),
-                          Text(
-                            _state.empleadoNombre!,
-                            style: const TextStyle(
-                              fontSize: 28,
+                      ),
+                      if (_permitirManual) ...[
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: _mostrarDialogoMarcacionOffline,
+                          icon: const Icon(
+                            Icons.keyboard_alt_outlined,
+                            color: Colors.white70,
+                            size: 16,
+                          ),
+                          label: const Text('MARCAR CON CÉDULA (OFFLINE)'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white70,
+                            side: const BorderSide(
+                              color: Colors.white24,
+                              width: 1.5,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            textStyle: const TextStyle(
+                              fontSize: 11,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'CÉDULA DE CIUDADANÍA: ${_state.empleadoCedula}',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                          if (_state.tipoRegistro != null) ...[
-                            const SizedBox(height: 12),
-                            Chip(
-                              backgroundColor: _state.mensajeColor.withOpacity(
-                                0.25,
-                              ),
-                              label: Text(
-                                _getTipoRegistroLabel(_state.tipoRegistro!),
-                                style: TextStyle(
-                                  color: _state.mensajeColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              side: BorderSide(color: _state.mensajeColor),
-                            ),
-                          ],
-                          if (_state.distancia != null) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              'Precisión facial: ${(100 - _state.distancia! * 100).toStringAsFixed(1)}% (dist. ${_state.distancia!.toStringAsFixed(3)})',
-                              style: const TextStyle(
-                                color: Colors.white38,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ],
+                        ),
                       ],
-                    ),
-            ),
+                    ],
+                  ),
+                ),
+            ],
           ),
-        ],
-      ),
-    );
+        ),
+      );
+    }
+
+    // --- CONSTRUCCIÓN DEL LAYOUT ADAPTATIVO ---
+
+    if (isLandscape) {
+      // DISEÑO HORIZONTAL (TABLETS)
+      return Scaffold(
+        backgroundColor: AppColors.kioskBackground,
+        appBar: AppBar(
+          title: const Text('Tótem de Asistencia'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          actions: [],
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              buildClockSection(),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Row(
+                    children: [
+                      // Lado izquierdo: Mensajes de estado e info
+                      Expanded(
+                        flex: 4,
+                        child: Center(
+                          child: SingleChildScrollView(child: buildInfoPanel()),
+                        ),
+                      ),
+                      // Centro: Caja de la cámara / Foto
+                      Center(child: buildCameraBox()),
+                      // Lado derecho: Botones de Entrada/Salida u Opciones
+                      Expanded(
+                        flex: 4,
+                        child: Center(
+                          child: SingleChildScrollView(
+                            child: buildOptionsPanel(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      );
+    } else {
+      // DISEÑO VERTICAL (fallback para móviles / portarretrato)
+      return Scaffold(
+        backgroundColor: AppColors.kioskBackground,
+        appBar: AppBar(
+          title: const Text('Tótem de Asistencia'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          actions: [
+            IconButton(
+              icon: const Icon(
+                Icons.psychology_outlined,
+                color: Colors.white30,
+              ),
+              tooltip: 'Simular marcación (Offline Debug)',
+              onPressed: _procesando ? null : _simularEscaneoFacial,
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            buildClockSection(),
+            Expanded(child: Center(child: buildCameraBox())),
+            const SizedBox(height: 16),
+            buildInfoPanel(),
+            buildOptionsPanel(),
+            const SizedBox(height: 16),
+          ],
+        ),
+      );
+    }
   }
 }
