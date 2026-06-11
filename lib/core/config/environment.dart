@@ -6,6 +6,7 @@ class Environment {
   static const AppEnvironment active = AppEnvironment.prod;
 
   // URL del servidor de desarrollo (Local). Mapeada al puerto 8085 según la configuración de Fortinet y Docker Compose.
+  // static const String devBaseUrl = 'http://181.79.25.235:8085';
   static const String devBaseUrl = 'http://181.79.25.235:8085';
 
   // URL del servidor de producción.
